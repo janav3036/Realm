@@ -276,6 +276,12 @@ def generate_board():
         hexes[idx]["number"] = number
 
     vertices, edges = build_adjacency_maps(hexes)
+    # Build a reverse map: hex_id -> [vertex_ids]
+    for h in hexes:
+        h["adjacent_vertices"] = [
+            v["id"] for v in vertices if h["id"] in v["adjacent_hexes"]
+        ]
+
 
     return {
         "hexes": hexes,
