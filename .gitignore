@@ -1,1 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
 .venv/
+venv/
+
+# Node
+client/node_modules/
+client/package-lock.json
+
+# macOS
+.DS_Store
