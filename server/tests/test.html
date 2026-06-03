@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head><title>Realm Test</title></head>
+<body>
+<h3>Realm Server Test</h3>
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+<script>
+  const socket = io("http://localhost:5050");
+
+  socket.on("connect", () => console.log("✅ connected:", socket.id));
+  socket.on("room_created", d => console.log("room_created:", d));
+  socket.on("joined_room", d => console.log("joined_room:", d));
+  socket.on("state_update", d => console.log("state_update:", d));
+  socket.on("error", d => console.error("error:", d));
+
+  window.socket = socket; // expose for console use
+</script>
+</body>
+</html>
