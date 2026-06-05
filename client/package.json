@@ -7,7 +7,8 @@
         "build": "vite build"
     },
     "dependencies": {
-        "phaser": "3.60.0"
+        "phaser": "3.60.0",
+        "socket.io-client": "^4.8.3"
     },
     "devDependencies": {
         "vite": "^5.0.0"

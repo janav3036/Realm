@@ -65,19 +65,14 @@ def can_place_settlement(state, vertex_id, player_id, setup=False):
         
     return True, "" 
 
-def can_place_road(state, edge_id, player_id):
+def can_place_road(state, edge_id, player_id, free=False):
     board = state["board"]
     player = state["players"][player_id]
     edge = board["edges"][edge_id]
 
-    # Check 1: edge must be empty
     if edge["road"] is not None:
         return False, "Edge already has a road"
 
-    # Check 2: must connect to player's network
-    # A vertex on this edge counts as connected if:
-    # - the player owns a building there, OR
-    # - one of the player's roads touches that vertex
     player_roads = set(player["buildings"]["roads"])
     player_settlements = set(player["buildings"]["settlements"] + player["buildings"]["cities"])
     connected = False
@@ -93,9 +88,9 @@ def can_place_road(state, edge_id, player_id):
     if not connected:
         return False, "No network connection"
 
-    # Check 3: resources
-    if player["resources"]["timber"] < 1 or player["resources"]["stone"] < 1:
-        return False, "Insufficient resources"
+    if not free:
+        if player["resources"]["timber"] < 1 or player["resources"]["stone"] < 1:
+            return False, "Insufficient resources"
 
     return True, ""
 

@@ -2,7 +2,8 @@ import random
 import time
 import uuid
 
-from flask import Flask, request
+import os
+from flask import Flask, request, send_from_directory
 from flask_socketio import SocketIO, emit, join_room
 
 from game_logic import (
@@ -17,6 +18,8 @@ from game_logic import (
 from board_generator import generate_board
 from room_manager import create_room, get_room, add_player_to_room, remove_player, get_room_by_socket
 from card_system import create_deck, draw_card, resolve_action_card
+
+CLIENT_DIST = os.path.join(os.path.dirname(__file__), '..', 'client', 'dist')
 
 app = Flask(__name__)
 app.config["SECRET_KEY"] = "dev-secret"
@@ -111,6 +114,9 @@ def on_start_game(data):
     if room["host_player_id"] != player_id:
         emit("error", {"code": "NOT_HOST", "message": "Only the host can start the game"})
         return
+    if room["status"] != "lobby":
+        emit("error", {"code": "ALREADY_STARTED", "message": "Game already in progress"})
+        return
     if len(room["players"]) < 2:
         emit("error", {"code": "TOO_FEW", "message": "Need at least 2 players"})
         return
@@ -144,6 +150,7 @@ def on_action(data):
     winner = check_win_condition(state)
     if winner and not state["winner"]:
         state["winner"] = winner
+        state["game_over"] = True
         room["status"] = "ended"
         log(state, winner, "wins!")
     broadcast(room_code, state)
@@ -294,13 +301,18 @@ def _buy_card(state, player_id):
 
 
 def _build_road(state, player_id, action):
-    ok, reason = can_place_road(state, action["edge_id"], player_id)
+    reinforce = state["turn"].get("reinforce_active", False)
+    ok, reason = can_place_road(state, action["edge_id"], player_id, free=reinforce)
     if not ok:
         return reason
     place_road(state, action["edge_id"], player_id)
-    deduct_building_cost(state, player_id, "road")
+    if not reinforce:
+        deduct_building_cost(state, player_id, "road")
+    else:
+        state["turn"]["reinforce_active"] = False
     update_longest_road_award(state)
     log(state, player_id, f"built road at edge {action['edge_id']}")
+
 
 
 def _build_settlement(state, player_id, action):
@@ -362,6 +374,94 @@ def _end_turn(state, player_id):
     log(state, player_id, "ended turn")
 
 
+# ── QUIT / END GAME ──────────────────────────────────────────────────────────
+
+def _handle_player_quit(room_code, player_id, room):
+    state = room.get("game_state")
+    if not state or player_id not in state.get("players", {}):
+        return
+
+    state["players"][player_id]["connected"] = False
+    state["player_order"] = [p for p in state["player_order"] if p != player_id]
+    state["turn"]["setup_order"] = [
+        p for p in state["turn"].get("setup_order", []) if p != player_id
+    ]
+
+    active = [p for p in state["player_order"]
+              if state["players"][p].get("connected", True)]
+
+    if not active:
+        room["status"] = "ended"
+        return  # nobody left to broadcast to
+
+    if len(active) == 1:
+        winner = active[0]
+        state["winner"] = winner
+        state["game_over"] = True
+        room["status"] = "ended"
+        log(state, winner, "wins — last player remaining")
+        broadcast(room_code, state)
+        return
+
+    # 2+ players remain — advance turn if the quitter was the active player
+    if state["turn"]["current_player"] == player_id:
+        phase = state["turn"]["phase"]
+        if phase in ("setup_s1", "setup_s2", "setup_road"):
+            so = state["turn"]["setup_order"]
+            if so:
+                state["turn"]["current_player"] = so[0]
+                r = state["turn"]["setup_round"]
+                state["turn"]["phase"] = f"setup_s{r}"
+            else:
+                for pid in state["player_order"]:
+                    for _ in range(4):
+                        draw_card(state, pid)
+                state["turn"]["current_player"] = state["player_order"][0]
+                state["turn"]["phase"] = "draw"
+        else:
+            state["turn"].update({
+                "current_player": active[0],
+                "phase": "draw",
+                "rolled": False,
+                "dice": None,
+                "dice_total": None,
+                "active_trade": None,
+                "must_discard": [],
+            })
+            state["turn"]["turn_number"] = state["turn"].get("turn_number", 1) + 1
+
+    broadcast(room_code, state)
+
+
+@socket_io.on("quit_game")
+def on_quit_game(data):
+    room_code = data.get("room_code")
+    player_id = data.get("player_id")
+    room = get_room(room_code)
+    if not room or not room.get("game_state"):
+        return
+    _handle_player_quit(room_code, player_id, room)
+
+
+@socket_io.on("end_game")
+def on_end_game(data):
+    room_code = data.get("room_code")
+    player_id = data.get("player_id")
+    room = get_room(room_code)
+    if not room or not room.get("game_state"):
+        emit("error", {"code": "NOT_FOUND", "message": "No active game"})
+        return
+    if room["host_player_id"] != player_id:
+        emit("error", {"code": "NOT_HOST", "message": "Only the host can end the game"})
+        return
+    state = room["game_state"]
+    state["winner"] = None
+    state["game_over"] = True
+    room["status"] = "ended"
+    log(state, player_id, "ended the game")
+    broadcast(room_code, state)
+
+
 # ── CHAT / DISCONNECT ─────────────────────────────────────────────────────────
 
 @socket_io.on("chat")
@@ -382,11 +482,23 @@ def on_disconnect():
     if not room_code:
         return
     room = get_room(room_code)
-    if room and room.get("game_state") and player_id in room["game_state"]["players"]:
-        room["game_state"]["players"][player_id]["connected"] = False
-    if room:
+    if not room:
+        return
+    if room.get("game_state") and player_id in room["game_state"].get("players", {}):
+        _handle_player_quit(room_code, player_id, room)
+    else:
         name = room["players"].get(player_id, {}).get("name", "Unknown")
-        socket_io.emit("player_disconnected", {"player_id": player_id, "player_name": name}, to=room_code)
+        socket_io.emit("player_disconnected",
+                       {"player_id": player_id, "player_name": name},
+                       to=room_code)
+
+
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def serve_client(path):
+    if path and os.path.exists(os.path.join(CLIENT_DIST, path)):
+        return send_from_directory(CLIENT_DIST, path)
+    return send_from_directory(CLIENT_DIST, 'index.html')
 
 
 if __name__ == "__main__":

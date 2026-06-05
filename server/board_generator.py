@@ -180,7 +180,7 @@ def build_adjacency_maps(hexes):
     vertex_pixels = {}
     for vid, (q, r, i) in vertex_corner_info.items():
         hx, hy = hex_to_pixel(q, r, hex_size)
-        angle = math.pi / 3 * (i + 1) - math.pi / 6
+        angle = -math.pi / 3 * i - math.pi / 6
         vertex_pixels[vid] = (
             hx + hex_size * math.cos(angle),
             hy + hex_size * math.sin(angle)
