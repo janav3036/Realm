@@ -93,9 +93,10 @@ export default class UIScene extends Phaser.Scene {
         this._collapsed      = false;
         this._stateHandler   = this._onStateUpdate.bind(this);
         this._registryHandler = null;
-        this.isMobile  = false;
-        this._mHud     = null;
-        this._mTab     = 'decree';
+        this.isMobile            = false;
+        this._mHud               = null;
+        this._mTab               = 'decree';
+        this._orientationHandler = null;
     }
 
     create() {
@@ -128,6 +129,9 @@ export default class UIScene extends Phaser.Scene {
             this._tabArrow.on('pointerdown', () => this._toggleSidebar());
         } else {
             this._initMobileHUD();
+            this._orientationHandler = this._onOrientationChange.bind(this);
+            window.addEventListener('resize', this._orientationHandler);
+            this._onOrientationChange();
             this.registry.events.on('changedata-buildMode', () => {
                 if (this.gameState) this._renderMobileTab(this._mTab, this.gameState);
             });
@@ -145,6 +149,10 @@ export default class UIScene extends Phaser.Scene {
         Network.off('state_update', this._stateHandler);
         if (this._registryHandler) {
             this.registry.events.off('changedata-gameState', this._registryHandler);
+        }
+        if (this._orientationHandler) {
+            window.removeEventListener('resize', this._orientationHandler);
+            this._orientationHandler = null;
         }
         if (this.isMobile) this._removeMobileHUD();
     }
@@ -1165,7 +1173,10 @@ export default class UIScene extends Phaser.Scene {
 
         const toggle = () => {
             el.classList.toggle('open');
-            el.querySelector('#m-peek-arrow').textContent = el.classList.contains('open') ? '▼' : '▲';
+            const ls   = el.classList.contains('landscape');
+            const open = el.classList.contains('open');
+            el.querySelector('#m-peek-arrow').textContent =
+                ls ? (open ? '▷' : '◁') : (open ? '▼' : '▲');
         };
         el.querySelector('#m-handle').addEventListener('click', toggle);
         el.querySelector('#m-peek-row').addEventListener('click', toggle);
@@ -1185,6 +1196,16 @@ export default class UIScene extends Phaser.Scene {
 
     _removeMobileHUD() {
         if (this._mHud) { this._mHud.remove(); this._mHud = null; }
+    }
+
+    _onOrientationChange() {
+        if (!this._mHud) return;
+        const isLandscape = window.innerWidth > window.innerHeight;
+        if (this._mHud.classList.contains('landscape') === isLandscape) return;
+        this._mHud.classList.remove('open');
+        this._mHud.classList.toggle('landscape', isLandscape);
+        const arrow = this._mHud.querySelector('#m-peek-arrow');
+        if (arrow) arrow.textContent = isLandscape ? '◁' : '▲';
     }
 
     _updateMobileHUD(state) {
@@ -1235,7 +1256,8 @@ export default class UIScene extends Phaser.Scene {
         const bMode = this.registry.get('buildMode');
         if (bMode && this._mHud.classList.contains('open')) {
             this._mHud.classList.remove('open');
-            this._mHud.querySelector('#m-peek-arrow').textContent = '▲';
+            const ls = this._mHud.classList.contains('landscape');
+            this._mHud.querySelector('#m-peek-arrow').textContent = ls ? '◁' : '▲';
         }
     }
 
