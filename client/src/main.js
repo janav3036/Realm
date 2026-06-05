@@ -9,7 +9,7 @@ const config = {
     type: Phaser.AUTO,
     width: window.innerWidth,
     height: window.innerHeight,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: '#07060f',
     scene: [BootScene, LobbyScene, GameScene, UIScene, EndScene],
     scale: {
         mode: Phaser.Scale.RESIZE,
@@ -20,4 +20,11 @@ const config = {
     },
 };
 
-new Phaser.Game(config);
+const launch = () => new Phaser.Game(config);
+
+// Wait for Google Fonts before creating the game so Phaser text renders correctly
+if (document.fonts?.ready) {
+    document.fonts.ready.then(launch);
+} else {
+    launch();
+}

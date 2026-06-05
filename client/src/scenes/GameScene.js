@@ -143,7 +143,7 @@ export default class GameScene extends Phaser.Scene {
             (phase === 'action' && this.buildMode === 'road');
         const showH = phase === 'robber';
 
-        this._hintGfx.lineStyle(2, 0xffffff, 0.5);
+        this._hintGfx.lineStyle(2, 0xc9a227, 0.6);
 
         if (showV) {
             let vertices;
@@ -255,9 +255,12 @@ export default class GameScene extends Phaser.Scene {
 
     _onError(data) {
         const { width, height } = this.scale;
-        const t = this.add.text(width / 2, height / 2 - 20, `⚠ ${data.message}`, {
-            fontSize: '18px', color: '#e74c3c',
-            backgroundColor: '#1a1a2e', padding: { x: 14, y: 8 },
+        const t = this.add.text(width / 2, height / 2 - 20, `⚠  ${data.message}`, {
+            fontFamily: '"Cinzel", Georgia, serif',
+            fontSize: '14px',
+            color: '#c41e3a',
+            backgroundColor: '#07060f',
+            padding: { x: 16, y: 10 },
         }).setOrigin(0.5).setDepth(200);
         this.time.delayedCall(3000, () => t.destroy());
     }
