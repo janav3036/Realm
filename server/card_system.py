@@ -32,6 +32,7 @@ CARD_TYPES = {
     "Victory Point": "vp",
 }
 
+STRUCTURE_CARDS = {"Watchtower", "Granary", "Forge", "Harbour", "Barracks"}
 
 def create_deck():
     deck = []
@@ -114,10 +115,13 @@ def resolve_action_card(state, card_id, player_id, target):
         return state
     
     card_name = card["name"]
+    is_structure = card_name in STRUCTURE_CARDS
+
+    
     if card_name == "Harvest":
         resource = target.get("resource")
         if resource:
-            state["players"][player_id]["resources"][resource] += 2
+            player["resources"][resource] += 2
 
     elif card_name == "Plunder":
         steal_from = target.get("target_player")
@@ -131,7 +135,6 @@ def resolve_action_card(state, card_id, player_id, target):
 
     elif card_name == "Sabotage":
         player["sabotage_cards_played"] += 1
-        # robber movement handled separately via move_robber action
 
     elif card_name == "Caravan":
         state["turn"]["caravan_active"] = True
@@ -139,10 +142,32 @@ def resolve_action_card(state, card_id, player_id, target):
     elif card_name == "Reinforce":
         state["turn"]["reinforce_active"] = True
 
-    # Remove from hand, add to discard
+    elif card_name == "Surplus":
+        dice_total = state["turn"].get("dice_total")
+        if dice_total:
+            board = state["board"]
+            for hex_ in board["hexes"]:
+                if hex_["number"] != dice_total or hex_["has_robber"]:
+                    continue
+                for vid in hex_["adjacent_vertices"]:
+                    vertex = board["vertices"][vid]
+                    if vertex["owner"] == player_id and vertex["building"]:
+                        player["resources"][hex_["resource"]] += 1
+
+    elif card_name == "Militia":
+        militia_target = target.get("target_player")
+        if militia_target:
+            state["turn"]["militia_target"] = militia_target
+
+    elif is_structure:
+        player["structures_in_play"].append({
+            "card_id": card_id,
+            "card_name": card_name,
+            "attached_vertex": -1,
+        })
+
     player["hand"] = [c for c in player["hand"] if c["id"] != card_id]
-    state["deck"]["discard_pile"].append(card_name)
+    if not is_structure:
+        state["deck"]["discard_pile"].append(card_name)
 
     return state
-
-

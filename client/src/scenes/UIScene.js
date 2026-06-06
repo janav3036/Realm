@@ -884,6 +884,7 @@ export default class UIScene extends Phaser.Scene {
         const RESOURCES = ['timber', 'stone', 'grain', 'wool', 'ore'];
         const giving    = { timber: 0, stone: 0, grain: 0, wool: 0, ore: 0 };
         const receiving = { timber: 0, stone: 0, grain: 0, wool: 0, ore: 0 };
+        const caravanActive = state.turn?.caravan_active ?? false;
         const redraw = () => { this._clearModal(); this._showingModal = 'trade'; buildPanel(); };
 
         const buildPanel = () => {
@@ -912,11 +913,11 @@ export default class UIScene extends Phaser.Scene {
                     }).setOrigin(0.5).setDepth(51);
                     box.on('pointerover', () => box.setAlpha(0.8));
                     box.on('pointerout',  () => box.setAlpha(1));
-                    box.on('pointerdown', () => { RESOURCES.forEach(k => obj[k] = 0); obj[r] = isPrimary ? 4 : 1; redraw(); });
+                    box.on('pointerdown', () => { RESOURCES.forEach(k => obj[k] = 0); obj[r] = isPrimary ? (caravanActive ? 2 : 4) : 1; redraw(); });
                     this._mtrack(box, t);
                 });
             };
-            makeRow('OFFER  (4)', giving,    -46, true);
+            makeRow(`OFFER  (${caravanActive ? '2' : '4'})`, giving,    -46, true);
             makeRow('RECEIVE (1)', receiving,  34, false);
 
             const cancelBg = this.add.rectangle(MX - 80, MY + PH/2 - 30, 120, 30, C.void, 1)

@@ -4,11 +4,12 @@ def distribute_resources(state, dice_total):
     board = state["board"]
     players = state["players"]
     vertices = {v["id"]: v for v in board["vertices"]}
+    drought = state["turn"].get("drought_active", False)
 
     for hex_ in board["hexes"]:
         if hex_["number"] != dice_total:
             continue
-        if hex_["has_robber"]:
+        if hex_["resource"] == "grain" and drought:
             continue
 
         for vid in hex_["adjacent_vertices"]:
@@ -17,11 +18,26 @@ def distribute_resources(state, dice_total):
                 continue
 
             owner = vertex["owner"]
+            player = players[owner]
+
+            if hex_["has_robber"]:
+                has_granary = any(
+                    s["card_name"] == "Granary"
+                    for s in player.get("structures_in_play", [])
+                )
+                if not has_granary:
+                    continue
+
             resource = hex_["resource"]
             amount = 2 if vertex["building"] == "city" else 1
-            players[owner]["resources"][resource] += amount
-    
+            player["resources"][resource] += amount
+
+            if vertex["building"] == "city" and resource == "ore":
+                if any(s["card_name"] == "Forge" for s in player.get("structures_in_play", [])):
+                    player["resources"]["ore"] += 1
+
     return state
+
 
 def handle_seven(state, active_player_id):
     #Find player who have more than 7 resources
@@ -185,8 +201,11 @@ def get_player_port_rates(state, player_id):
     board = state["board"]
     player = state["players"][player_id]
 
+    if state.get("turn", {}).get("caravan_active"):
+        return {"timber": 2, "stone": 2, "grain": 2, "wool": 2, "ore": 2}
+
     rates = {"timber": 4, "stone": 4, "grain": 4, "wool": 4, "ore": 4}
-    
+
     all_buildings = player["buildings"]["settlements"] + player["buildings"]["cities"]
     for vid in all_buildings:
         port = board["vertices"][vid]["port"]
@@ -199,6 +218,12 @@ def get_player_port_rates(state, player_id):
         else:
             if rates[port] > 2:
                 rates[port] = 2
+
+    for s in player.get("structures_in_play", []):
+        if s["card_name"] == "Harbour":
+            for resource in rates:
+                if rates[resource] > 3:
+                    rates[resource] = 3
 
     return rates
 
@@ -363,6 +388,10 @@ def advance_turn(state):
     state["turn"]["dice_total"] = None
     state["turn"]["phase"] = "draw"
     state["turn"]["active_trade"] = None
+
+    for flag in ("caravan_active", "reinforce_active", "drought_active", "militia_target"):
+        state["turn"].pop(flag, None)
+    state["turn"]["must_discard"] = []
 
     return state
 

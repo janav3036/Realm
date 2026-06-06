@@ -280,16 +280,29 @@ def _move_robber(state, player_id, action):
     move_robber(state, hex_id, action.get("steal_from"), player_id)
     log(state, player_id, f"moved robber to hex {hex_id}")
 
-
 def _play_card(state, player_id, action):
+    if state["turn"]["phase"] != "action":
+        return "Can only play cards during the action phase"
     card_id = action["card_id"]
+    player = state["players"][player_id]
+    card = next((c for c in player["hand"] if c["id"] == card_id), None)
+    if not card:
+        return "Card not in hand"
+    if card["type"] == "vp":
+        return "Cannot play Victory Point cards"
+    card_name = card["name"]
     target = {k: v for k, v in action.items() if k not in ("type", "card_id")}
     resolve_action_card(state, card_id, player_id, target)
     update_largest_army_award(state)
-    log(state, player_id, "played a card")
+    if card_name == "Sabotage":
+        state["turn"]["phase"] = "robber"
+    log(state, player_id, f"played {card_name}")
+
 
 
 def _buy_card(state, player_id):
+    if state["turn"]["phase"] != "action":
+        return "Can only buy cards during the action phase"
     player = state["players"][player_id]
     for r, amt in {"ore": 1, "grain": 1, "wool": 1}.items():
         if player["resources"].get(r, 0) < amt:
@@ -299,8 +312,15 @@ def _buy_card(state, player_id):
     draw_card(state, player_id)
     log(state, player_id, "bought extra card")
 
+def _militia_blocked(state, player_id):
+    if state["turn"].get("militia_target") != player_id:
+        return False
+    player = state["players"][player_id]
+    return not any(s["card_name"] == "Barracks" for s in player.get("structures_in_play", []))
 
 def _build_road(state, player_id, action):
+    if _militia_blocked(state, player_id):
+        return "The Militia has blocked your construction this turn"
     reinforce = state["turn"].get("reinforce_active", False)
     ok, reason = can_place_road(state, action["edge_id"], player_id, free=reinforce)
     if not ok:
@@ -316,6 +336,8 @@ def _build_road(state, player_id, action):
 
 
 def _build_settlement(state, player_id, action):
+    if _militia_blocked(state, player_id):
+        return "The Militia has blocked your construction this turn"
     ok, reason = can_place_settlement(state, action["vertex_id"], player_id)
     if not ok:
         return reason
@@ -325,6 +347,8 @@ def _build_settlement(state, player_id, action):
 
 
 def _build_city(state, player_id, action):
+    if _militia_blocked(state, player_id):
+        return "The Militia has blocked your construction this turn"
     ok, reason = can_upgrade_city(state, action["vertex_id"], player_id)
     if not ok:
         return reason
@@ -363,7 +387,10 @@ def _bank_trade(state, player_id, action):
     ok, _, reason = execute_bank_trade(state, player_id, action["giving"], action["receiving"])
     if not ok:
         return reason
+    if state["turn"].get("caravan_active"):
+        state["turn"]["caravan_active"] = False
     log(state, player_id, "bank trade")
+
 
 
 def _end_turn(state, player_id):
