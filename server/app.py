@@ -550,6 +550,7 @@ def serve_client(path):
         return send_from_directory(CLIENT_DIST, path)
     return send_from_directory(CLIENT_DIST, 'index.html')
 
-
 if __name__ == "__main__":
-    socket_io.run(app, debug=True, port=5050)
+    debug = os.environ.get("FLASK_DEBUG", "0") == "1"
+    socket_io.run(app, debug=debug, port=5050)
+
