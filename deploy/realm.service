@@ -3,14 +3,15 @@ Description=Realm Game Server
 After=network.target
 
 [Service]
-User=ubuntu
-WorkingDirectory=/home/ubuntu/realm/server
-Environment="PATH=/home/ubuntu/realm/server/venv/bin"
-ExecStart=/home/ubuntu/realm/server/venv/bin/gunicorn \
+User=janavdshah30
+WorkingDirectory=/home/janavdshah30/realm/server
+Environment="PATH=/home/janavdshah30/realm/server/venv/bin"
+ExecStart=/home/janavdshah30/realm/server/venv/bin/gunicorn \
     --worker-class eventlet \
     -w 1 \
     --bind 127.0.0.1:5000 \
     app:app
+
 Restart=always
 RestartSec=5
 

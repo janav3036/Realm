@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -e
 
-REPO_DIR="/home/ubuntu/realm"
+REPO_DIR="$HOME/realm"
 SERVER_DIR="$REPO_DIR/server"
 CLIENT_DIR="$REPO_DIR/client"
 
