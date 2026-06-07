@@ -7,7 +7,11 @@ CLIENT_DIR="$REPO_DIR/client"
 
 echo "=== Installing system packages ==="
 sudo apt-get update -q
-sudo apt-get install -y python3-pip python3-venv nginx certbot python3-certbot-nginx git nodejs npm
+sudo apt-get install -y python3-pip python3-venv nginx certbot python3-certbot-nginx git
+
+echo "=== Installing Node.js 20 ==="
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt-get install -y nodejs
 
 echo "=== Cloning repo ==="
 git clone https://github.com/janav3036/Realm.git "$REPO_DIR"
