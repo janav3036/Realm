@@ -79,6 +79,7 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         if (state.winner || state.game_over) {
+            Network.clearSession();
             this.scene.stop('UIScene');
             this.scene.start('EndScene', { state });
             return;

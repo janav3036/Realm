@@ -16,7 +16,7 @@ from game_logic import (
     check_win_condition, advance_turn, get_next_setup_player,
 )
 from board_generator import generate_board
-from room_manager import create_room, get_room, add_player_to_room, remove_player, get_room_by_socket
+from room_manager import create_room, get_room, add_player_to_room, remove_player, get_room_by_socket, update_player_socket
 from card_system import create_deck, draw_card, resolve_action_card
 
 CLIENT_DIST = os.path.join(os.path.dirname(__file__), '..', 'client', 'dist')
@@ -409,55 +409,78 @@ def _handle_player_quit(room_code, player_id, room):
         return
 
     state["players"][player_id]["connected"] = False
-    state["player_order"] = [p for p in state["player_order"] if p != player_id]
-    state["turn"]["setup_order"] = [
-        p for p in state["turn"].get("setup_order", []) if p != player_id
-    ]
+    log(state, player_id, "disconnected")
 
     active = [p for p in state["player_order"]
               if state["players"][p].get("connected", True)]
-
+    
     if not active:
         room["status"] = "ended"
-        return  # nobody left to broadcast to
-
+        return
+    
     if len(active) == 1:
         winner = active[0]
         state["winner"] = winner
         state["game_over"] = True
         room["status"] = "ended"
-        log(state, winner, "wins — last player remaining")
+        log(state, winner, "wins - last player remaining")
         broadcast(room_code, state)
         return
-
-    # 2+ players remain — advance turn if the quitter was the active player
+    
     if state["turn"]["current_player"] == player_id:
-        phase = state["turn"]["phase"]
-        if phase in ("setup_s1", "setup_s2", "setup_road"):
-            so = state["turn"]["setup_order"]
-            if so:
-                state["turn"]["current_player"] = so[0]
-                r = state["turn"]["setup_round"]
-                state["turn"]["phase"] = f"setup_s{r}"
+        order = state["player_order"]
+        idx = order.index(player_id)
+        next_players = [order[(idx+i) % len(order)] for i in range(1, len(order))]
+        next_connected = next(
+            (p for p in next_players if state["players"][p].get("connected", True)), None
+        )
+        if next_connected:
+            phase = state["turn"]["phase"]
+            if phase in ("setup_s1", "setup_s2", "setup_road"):
+                state["turn"]["setup_order"] = [
+                    p for p in state["turn"].get("setup_order", []) if p != player_id
+                ]
+                state["turn"]["current_player"] = next_connected
+                state["turn"]["phase"] = f"setup_s{state['turn']['setup_round']}"
             else:
-                for pid in state["player_order"]:
-                    for _ in range(4):
-                        draw_card(state, pid)
-                state["turn"]["current_player"] = state["player_order"][0]
-                state["turn"]["phase"] = "draw"
-        else:
-            state["turn"].update({
-                "current_player": active[0],
-                "phase": "draw",
-                "rolled": False,
-                "dice": None,
-                "dice_total": None,
-                "active_trade": None,
-                "must_discard": [],
-            })
-            state["turn"]["turn_number"] = state["turn"].get("turn_number", 1) + 1
+                state["turn"].update({
+                    "current_player": next_connected,
+                    "phase": "draw",
+                    "rolled": False,
+                    "dice": None,
+                    "dice_total": None,
+                    "active_trade": None,
+                    "must_discard": [],
+                })
+                state["turn"]["turn_number"] = state["turn"].get("turn_number", 1) + 1
 
     broadcast(room_code, state)
+
+@socket_io.on("reconnect_player")
+def on_reconnect_player(data):
+    room_code = data.get("room_code")
+    player_id = data.get("player_id")
+    room = get_room(room_code)
+    if not room or not room.get("game_state"):
+        emit("error", {"code": "NOT_FOUND", "message": "Game not found"})
+        return
+    state = room["game_state"]
+    if player_id not in state["players"]:
+        emit("error", {"code": "NOT_FOUND", "message": "Player not in this game"})
+        return
+    update_player_socket(room_code, player_id, request.sid)
+    state["players"][player_id]["socket_id"] = request.sid
+    state["players"][player_id]["connected"] = True
+    join_room(room_code)
+    log(state, player_id, "reconnected")
+    emit("reconnected", {
+        "room_code": room_code,
+        "player_id": player_id,
+        "is_host": room["host_player_id"] == player_id,
+        "state": state,
+    })
+    broadcast(room_code, state)
+
 
 
 @socket_io.on("quit_game")

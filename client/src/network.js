@@ -45,14 +45,30 @@ class Network {
     }
 
     endGame() {
+        this.clearSession();
         this.socket.emit('end_game', { room_code: this.roomCode, player_id: this.playerId });
     }
     quitGame() {
+        this.clearSession();
         this.socket.emit('quit_game', { room_code: this.roomCode, player_id: this.playerId });
     }
+    saveSession(roomCode, playerId) {
+        localStorage.setItem('realm_session', JSON.stringify({ roomCode, playerId }));
+    }
 
-    on(event, cb) {this.socket.on(event, cb);}
-    off(event, cb) {this.socket.off(event, cb);}
+    clearSession() {
+        localStorage.removeItem('realm_session');
+    }
+
+    reconnect(roomCode, playerId) {
+        this.roomCode = roomCode;
+        this.playerId = playerId;
+        this.socket.emit('reconnect_player', { room_code: roomCode, player_id: playerId });
+    }
+
+
+    on(event, cb) { this.socket.on(event, cb); }
+    off(event, cb) { this.socket.off(event, cb); }
 }
 
 export default new Network();

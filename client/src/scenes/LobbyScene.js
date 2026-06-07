@@ -28,6 +28,13 @@ export default class LobbyScene extends Phaser.Scene {
         this._setupListeners();
 
         // If URL has ?room=XXXX, pre-fill the join form so reloads rejoin the room
+        const saved = localStorage.getItem('realm_session');
+        if (saved) {
+            try {
+                const { roomCode, playerId } = JSON.parse(saved);
+                if (roomCode && playerId) { Network.reconnect(roomCode, playerId); return; }
+            } catch (e) {}
+        }
         const roomParam = new URLSearchParams(window.location.search).get('room')?.toUpperCase().trim();
         this._showHome(roomParam?.length === 4 ? roomParam : null);
     }
@@ -48,6 +55,7 @@ export default class LobbyScene extends Phaser.Scene {
             joined_room:   this._onJoinedRoom.bind(this),
             state_update:  this._onStateUpdate.bind(this),
             error:         this._onError.bind(this),
+            reconnected:   this._onReconnected.bind(this),
         };
         Object.entries(this._boundHandlers).forEach(([ev, cb]) => Network.on(ev, cb));
     }
@@ -223,6 +231,7 @@ export default class LobbyScene extends Phaser.Scene {
         Network.roomCode  = data.room_code;
         Network.playerId  = data.player_id;
         this.myPlayerId   = data.player_id;
+        Network.saveSession(data.room_code, data.player_id);
         this.roomCode     = data.room_code;
         this.isHost       = true;
         this.hostId       = data.player_id;
@@ -235,6 +244,7 @@ export default class LobbyScene extends Phaser.Scene {
         Network.playerId = data.player_id;
         this.myPlayerId  = data.player_id;
         this.roomCode    = data.room_code;
+        Network.saveSession(data.room_code, data.player_id);
         history.replaceState(null, '', `?room=${data.room_code}`);
     }
 
@@ -259,5 +269,22 @@ export default class LobbyScene extends Phaser.Scene {
         const el = document.getElementById('errMsg');
         if (el) el.textContent = data.message;
         else console.warn('Server error:', data.message);
+        // If reconnect failed, clear stale session and show lobby
+        if (data.code === 'NOT_FOUND') {
+            Network.clearSession();
+            const roomParam = new URLSearchParams(window.location.search).get('room')?.toUpperCase().trim();
+            this._showHome(roomParam?.length === 4 ? roomParam : null);
+        }
+    }
+
+    _onReconnected(data) {
+        Network.roomCode  = data.room_code;
+        Network.playerId  = data.player_id;
+        this.myPlayerId   = data.player_id;
+        this.isHost       = data.is_host;
+        this._removeOverlay();
+        this.registry.set('myPlayerId', data.player_id);
+        this.registry.set('isHost', data.is_host);
+        this.scene.start('GameScene', { initialState: data.state });
     }
 }
