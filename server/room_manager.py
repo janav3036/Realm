@@ -55,3 +55,12 @@ def get_room_by_socket(socket_id):
             if pdata["socket_id"] == socket_id:
                 return code, pid
     return None, None
+
+def update_player_socket(room_code, player_id, new_socket_id):
+    room = rooms.get(room_code)
+    if not room:
+        return
+    if player_id in room["players"]:
+        room["players"][player_id]["socket_id"] = new_socket_id
+    if room["game_state"] and player_id in room["game_state"]["players"]:
+        room["game_state"]["players"][player_id]["socket_id"] = new_socket_id
