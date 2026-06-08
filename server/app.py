@@ -461,9 +461,22 @@ def on_reconnect_player(data):
     room_code = data.get("room_code")
     player_id = data.get("player_id")
     room = get_room(room_code)
-    if not room or not room.get("game_state"):
+    if not room:
         emit("error", {"code": "NOT_FOUND", "message": "Game not found"})
         return
+
+    # Lobby reconnect: game hasn't started yet
+    if not room.get("game_state"):
+        if player_id not in room.get("players", {}):
+            emit("error", {"code": "NOT_FOUND", "message": "Player not in this room"})
+            return
+        update_player_socket(room_code, player_id, request.sid)
+        join_room(room_code)
+        emit("joined_room", {"room_code": room_code, "player_id": player_id})
+        broadcast(room_code, {"status": "lobby", "room_code": room_code,
+                              "host": room["host_player_id"], "players": room["players"]})
+        return
+
     state = room["game_state"]
     if player_id not in state["players"]:
         emit("error", {"code": "NOT_FOUND", "message": "Player not in this game"})

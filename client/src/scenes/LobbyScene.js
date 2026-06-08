@@ -12,15 +12,16 @@ export default class LobbyScene extends Phaser.Scene {
     constructor() { super({ key: 'LobbyScene' }); }
 
     init() {
-        this.myPlayerId   = null;
-        this.myName       = '';
-        this.roomCode     = null;
-        this.isHost       = false;
-        this.hostId       = null;
-        this.lobbyPlayers = {};
-        this._uiItems     = [];
-        this._overlay     = null;
+        this.myPlayerId    = null;
+        this.myName        = '';
+        this.roomCode      = null;
+        this.isHost        = false;
+        this.hostId        = null;
+        this.lobbyPlayers  = {};
+        this._uiItems      = [];
+        this._overlay      = null;
         this._boundHandlers = {};
+        this._reconnecting = false;
     }
 
     create() {
@@ -32,7 +33,11 @@ export default class LobbyScene extends Phaser.Scene {
         if (saved) {
             try {
                 const { roomCode, playerId } = JSON.parse(saved);
-                if (roomCode && playerId) { Network.reconnect(roomCode, playerId); return; }
+                if (roomCode && playerId) {
+                    this._reconnecting = true;
+                    Network.reconnect(roomCode, playerId);
+                    return;
+                }
             } catch (e) {}
         }
         const roomParam = new URLSearchParams(window.location.search).get('room')?.toUpperCase().trim();
@@ -268,13 +273,13 @@ export default class LobbyScene extends Phaser.Scene {
     _onError(data) {
         const el = document.getElementById('errMsg');
         if (el) el.textContent = data.message;
-        else console.warn('Server error:', data.message);
-        // If reconnect failed, clear stale session and show lobby
-        if (data.code === 'NOT_FOUND') {
+        if (data.code === 'NOT_FOUND' && this._reconnecting) {
+            this._reconnecting = false;
             Network.clearSession();
             const roomParam = new URLSearchParams(window.location.search).get('room')?.toUpperCase().trim();
             this._showHome(roomParam?.length === 4 ? roomParam : null);
         }
+        if (!el) console.warn('Server error:', data.message);
     }
 
     _onReconnected(data) {
