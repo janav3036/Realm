@@ -165,9 +165,9 @@ export default class GameScene extends Phaser.Scene {
         );
         const showH = myTurn && phase === 'robber';
 
-        this.vertexZones.forEach(z => z.setActive(showV));
-        this.edgeZones.forEach(z   => z.setActive(showE));
-        this.hexZones.forEach(z    => z.setActive(showH));
+        this.vertexZones.forEach(z => { if (z.input) z.input.enabled = showV; });
+        this.edgeZones.forEach(z   => { if (z.input) z.input.enabled = showE; });
+        this.hexZones.forEach(z    => { if (z.input) z.input.enabled = showH; });
     }
 
     _drawHints() {

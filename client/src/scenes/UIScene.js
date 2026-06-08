@@ -1253,9 +1253,11 @@ export default class UIScene extends Phaser.Scene {
         // Re-render active tab content
         this._renderMobileTab(this._mTab, state);
 
-        // Auto-close drawer when build mode active (board needs to be tappable)
-        const bMode = this.registry.get('buildMode');
-        if (bMode && this._mHud.classList.contains('open')) {
+        // Auto-close drawer when board interaction is needed
+        const bMode      = this.registry.get('buildMode');
+        const needsBoard = bMode || phase === 'setup_s1' || phase === 'setup_s2'
+                        || phase === 'setup_road' || phase === 'robber';
+        if (needsBoard && isMyTurn && this._mHud.classList.contains('open')) {
             this._mHud.classList.remove('open');
             const ls = this._mHud.classList.contains('landscape');
             this._mHud.querySelector('#m-peek-arrow').textContent = ls ? '◁' : '▲';
