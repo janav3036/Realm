@@ -65,18 +65,23 @@ def draw_card(state, player_id):
     state["players"][player_id]["hand"].append(card_instance)
     return state
 
+def _notify(state, message):
+    state["turn"].setdefault("event_notifications", []).append(message)
+
 def resolve_event_card(state, card_name):
     players = state["players"]
 
     if card_name == "Gold Rush":
         for player in players.values():
             player["resources"]["ore"] += 1
+        _notify(state, "Gold Rush: All players received 1 Ore.")
 
     elif card_name == "Festival":
         for player_id in players:
             state = draw_card(state, player_id)
             state = draw_card(state, player_id)
-    
+        _notify(state, "Festival: All players drew 2 cards.")
+
     elif card_name == "Plague":
         for player in players.values():
             total = sum(player["resources"].values())
@@ -86,10 +91,12 @@ def resolve_event_card(state, card_name):
                     while player["resources"][resource] > 0 and discarded < 2:
                         player["resources"][resource] -= 1
                         discarded += 1
+        _notify(state, "Plague: Players with 6+ resources discarded 2.")
 
     elif card_name == "Earthquake":
         board = state["board"]
         hex_ = random.choice(board["hexes"])
+        roads_removed = 0
         for edge in board["edges"]:
             v0, v1 = edge["vertices"]
             v0_hexes = board["vertices"][v0]["adjacent_hexes"]
@@ -100,10 +107,13 @@ def resolve_event_card(state, card_name):
                     players[owner]["buildings"]["roads"].remove(edge["id"])
                     players[owner]["pieces_remaining"]["roads"] += 1
                     edge["road"] = None
-
+                    roads_removed += 1
+        resource = hex_.get("resource", "hex")
+        _notify(state, f"Earthquake: Roads around the {resource} hex were destroyed ({roads_removed} road{'s' if roads_removed != 1 else ''} removed).")
 
     elif card_name == "Drought":
         state["turn"]["drought_active"] = True
+        _notify(state, "Drought: No Grain production next round.")
 
     return state
 

@@ -59,6 +59,7 @@ def init_game_state(room):
             "setup_order": player_ids[:],
             "dice": None, "dice_total": None, "rolled": False,
             "turn_number": 1, "active_trade": None, "must_discard": [],
+            "event_notifications": [],
         },
         "robber_hex": desert["id"],
         "longest_road_owner": None, "largest_army_owner": None,
@@ -398,6 +399,7 @@ def _end_turn(state, player_id):
         return "Cannot end turn now"
     advance_turn(state)
     state["turn"]["phase"] = "draw"
+    state["turn"]["event_notifications"] = []
     log(state, player_id, "ended turn")
 
 

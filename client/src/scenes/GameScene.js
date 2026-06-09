@@ -159,9 +159,10 @@ export default class GameScene extends Phaser.Scene {
             phase === 'setup_s1' || phase === 'setup_s2' ||
             (phase === 'action' && (this.buildMode === 'settlement' || this.buildMode === 'city'))
         );
+        const reinforce = this.gameState?.turn?.reinforce_active ?? false;
         const showE = myTurn && (
             phase === 'setup_road' ||
-            (phase === 'action' && this.buildMode === 'road')
+            (phase === 'action' && (this.buildMode === 'road' || reinforce))
         );
         const showH = myTurn && phase === 'robber';
 
@@ -181,8 +182,9 @@ export default class GameScene extends Phaser.Scene {
 
         const showV = phase === 'setup_s1' || phase === 'setup_s2' ||
             (phase === 'action' && (this.buildMode === 'settlement' || this.buildMode === 'city'));
+        const reinforce = this.gameState?.turn?.reinforce_active ?? false;
         const showE = phase === 'setup_road' ||
-            (phase === 'action' && this.buildMode === 'road');
+            (phase === 'action' && (this.buildMode === 'road' || reinforce));
         const showH = phase === 'robber';
 
         this._hintGfx.lineStyle(2, 0xc9a227, 0.6);
@@ -265,7 +267,7 @@ export default class GameScene extends Phaser.Scene {
         const phase = this.gameState?.turn?.phase;
         if (phase === 'setup_road') {
             Network.sendAction({ type: 'place_setup_road', edge_id: eid });
-        } else if (this.buildMode === 'road') {
+        } else if (this.buildMode === 'road' || this.gameState?.turn?.reinforce_active) {
             Network.sendAction({ type: 'build_road', edge_id: eid });
             this.registry.set('buildMode', null);
         }

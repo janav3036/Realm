@@ -97,6 +97,7 @@ export default class UIScene extends Phaser.Scene {
         this._mHud               = null;
         this._mTab               = 'decree';
         this._orientationHandler = null;
+        this._seenNotifications  = new Set();
     }
 
     create() {
@@ -195,6 +196,43 @@ export default class UIScene extends Phaser.Scene {
         if (state.game_over || state.winner) { this.scene.stop(); return; }
         this.gameState = state;
         this._renderDynamic();
+        this._checkEventNotifications(state);
+    }
+
+    _checkEventNotifications(state) {
+        const notifications = state.turn?.event_notifications ?? [];
+        const turnNum = state.turn?.turn_number ?? 0;
+        notifications.forEach(msg => {
+            const key = `${turnNum}:${msg}`;
+            if (!this._seenNotifications.has(key)) {
+                this._seenNotifications.add(key);
+                this._showEventToast(msg);
+            }
+        });
+    }
+
+    _showEventToast(message) {
+        const toast = document.createElement('div');
+        toast.style.cssText = `
+            position: fixed; left: 50%; transform: translateX(-50%);
+            top: 18px; z-index: 9999;
+            background: rgba(20,14,8,0.95);
+            border: 1px solid #c9a227;
+            color: #e8dcc8;
+            font-family: 'IM Fell English SC', Georgia, serif;
+            font-size: 13px;
+            padding: 10px 20px;
+            border-radius: 3px;
+            box-shadow: 0 0 18px rgba(201,162,39,0.25);
+            pointer-events: none;
+            text-align: center;
+            max-width: 340px;
+            transition: opacity 0.5s;
+        `;
+        toast.textContent = message;
+        document.body.appendChild(toast);
+        setTimeout(() => { toast.style.opacity = '0'; }, 3500);
+        setTimeout(() => { toast.remove(); }, 4000);
     }
 
     // ── dynamic render ────────────────────────────────────────────
